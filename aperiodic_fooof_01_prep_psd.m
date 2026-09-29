@@ -3,29 +3,32 @@ clear all;
 
 %% set config parameters -------------------------------------------------
 
-project = 'allApe';
-analydate = "01-Juni-2026"; %# TODO: make this more flexible to accept english/german, different format
+project = 'DynBUrest';
+analydate = [];%"01-Juni-2026"; %# TODO: make this more flexible to accept english/german, different format
 %start_sub = 'sub-135'; %# TODO: add option to pass sub list?
 
 freq_lp = 124; % what was the low pass filter in preprocessing?
 freq_res = 0.5; %this very much determines size of resulting data set
 
 min_ep = 5; % how many epochs do we need per participant?
-all_subs = true; % should we make a struct including all subjects data?
+all_subs = false; % should we make a struct including all subjects data?
+log_condition_data = false; % write open/closed condition summaries to the logfile
+compare_conditions = false; % compare and concatenate open+closed PSDs when both conditions exist; set false for open-only data
 
 %% set paths -------------------------------------------------------------
-
-eeglabDir = 'Z:\pb\KPP_KPN_joined\DynBU\analyses\toolboxes\eeglab2026.0.0';
+% #TODO: make this more flexible
+%eeglabDir = 'Z:\pb\KPP_KPN_joined\DynBU\analyses\toolboxes\eeglab2026.0.0';
+eeglabDir = "C:\Users\bbe0557\HomeOffice\toolboxes\eeglab2026.0.0";
 addpath(eeglabDir)
 
-%file   = mfilename('fullpath');
-file = 'Z:\pb\KPP_KPN_joined\Aperiodic\Alena\Analyses\scripts\Aperiodic-Slope-Paper\aperiodic_fooof_01_prep_psd.m';
-fparts = strsplit(file, filesep);
+%%file   = mfilename('fullpath');
+% file = 'Z:\pb\KPP_KPN_joined\Aperiodic\Alena\Analyses\scripts\Aperiodic-Slope-Paper\aperiodic_fooof_01_prep_psd.m';
+% fparts = strsplit(file, filesep);
 
 %addpath(eeglabDir)
-HomeDir = strjoin(fparts(1:find(strcmp(fparts, 'Alena'))), filesep);
-dataDir = fullfile(HomeDir, 'Data');
-saveDir = fullfile(dataDir, project, 'PSD');
+% HomeDir = strjoin(fparts(1:find(strcmp(fparts, 'Alena'))), filesep);
+dataDir = "Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic";%fullfile(HomeDir, 'Data');
+saveDir = fullfile(dataDir, 'PSD');
 
 logfile = fullfile(saveDir, 'fooof_01_log.txt');
 
@@ -34,8 +37,8 @@ if ~exist(saveDir, 'dir'); mkdir(saveDir); end
 eeglab('nogui');
 
 %% get subject data and check if summary should be created
-sub_data = readtable(fullfile(dataDir,  'participants', 'all_participant_data.csv'));
-subnames = sub_data.ID;
+sub_data = readtable("Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic\sub_sd.csv");%readtable(fullfile(dataDir,  'participants', 'all_participant_data.csv'));
+subnames = sub_data.Subject;%sub_data.ID;
 
 if exist("start_sub", 'var') 
     subnames = subnames(find(strcmp(subnames, start_sub),1, 'first'):end);
@@ -59,19 +62,22 @@ writelines(start_msg, logfile, 'WriteMode','overwrite')
 %loop over subs
 for s = 1:length(subnames)
     fprintf('working on %s\n', subnames{s})
-    ogProject = sub_data.Project{s}; % might be renamed ogProject
-    subnum = regexp(subnames{s}, '_([\d{3}]+)', 'tokens');
-    sub = strjoin(['sub' subnum{1}], '-');
-    EEGdir = fullfile(dataDir, ogProject, 'derivatives', 'preprocessed_eeg_baseline', '06_epoched_runica');
+%    ogProject = sub_data.Project{s}; % might be renamed ogProject
+%    subnum = regexp(subnames{s}, '_([\d{3}]+)', 'tokens');
+    sub = subnames{s};%strjoin(['sub' subnum{1}], '-');
+    EEGdir = fullfile(dataDir, 'preproc', '06_epoched_runica'); %fullfile(dataDir, ogProject, 'derivatives', 'preprocessed_eeg_baseline', '06_epoched_runica');
     sets = dir(fullfile(EEGdir, sub, '*final.set'));
     
     if ~exist(fullfile(EEGdir, sub), 'dir')
-        fprintf('subject folder not found: %s, %s\n', ogProject, sub)
-        writelines(sprintf('subject folder not found: %s, %s\n', ogProject, sub), logfile, 'WriteMode','append');
+        msg = sprintf('subject folder not found: %s\n', sub);
+        disp(msg)
+        writelines(msg, logfile, 'WriteMode','append');
         continue
     end
 
-    savePath = fullfile(saveDir, strjoin(["sub" string(sub_data.apeID(s))], '-'));
+%    savePath = fullfile(saveDir, strjoin(["sub" string(sub_data.apeID(s))], '-'));
+    savePath = fullfile(saveDir, sub);
+    clear PSDopen PSDclosed PSDall
 
     if ~isfolder(savePath)
         mkdir(savePath)
@@ -94,8 +100,10 @@ for s = 1:length(subnames)
         sr = EEG.srate;
         win = sr/freq_res; % freq_res = fs/win
 
-        if length(sets)<2
-            writelines(sprintf('\n%s (%s) dataset for only 1 condition: %s\n', sub_data.apeID(s), subnames{s}, cond), logfile, 'WriteMode','append');
+        if length(sets) < 2 && compare_conditions
+            if log_condition_data
+                writelines(sprintf('\n%s (%s) dataset for only 1 condition: %s\n', sub_data.apeID(s), subnames{s}, cond), logfile, 'WriteMode','append');
+            end
             continue
         end
 
@@ -104,40 +112,66 @@ for s = 1:length(subnames)
             psd(find(freqs<=freq_lp, 1,'last'):end,:)= [];
             freqs(find(freqs<=freq_lp, 1,'last'):end,:)= [];
             if ep == 1
-                PSDopen = nan([length(freqs) EEG.nbchan size(EEG.data,3)]);
-                PSDclosed = PSDopen;
+                if strcmp(cond, 'open')
+                    PSDopen = nan([length(freqs) EEG.nbchan size(EEG.data,3)]);
+                elseif strcmp(cond, 'closed')
+                    PSDclosed = nan([length(freqs) EEG.nbchan size(EEG.data,3)]);
+                end
             end
             if strcmp(cond, 'open')
-                PSDopen(:,:,ep) = psd;            
+                PSDopen(:,:,ep) = psd;
             elseif strcmp(cond, 'closed')
                 PSDclosed(:,:,ep) = psd;
             end
         end
 
-        writelines(sprintf('%s: number of epochs in %s condition: %d', subnames{s}, cond, ep), logfile, 'WriteMode','append');
+        if log_condition_data
+            writelines(sprintf('%s: number of epochs in %s condition: %d', subnames{s}, cond, ep), logfile, 'WriteMode','append');
+        end
 
         if exist('avail_data', 'var'), avail_data.([cond '_epochs'])(s) = ep; end
 
     end    
 
-    if size(PSDclosed,3) ~= size(PSDopen,3)
-        n_ep = diff([size(PSDclosed,3) size(PSDopen,3)]);
-        if size(PSDclosed,3) < size(PSDopen, 3)
-            PSDclosed = concatdata({PSDclosed nan(size(PSDclosed,1),size(PSDclosed,2), n_ep)});
-        else
-            PSDopen = concatdata({PSDopen nan(size(PSDopen,1),size(PSDopen,2), n_ep)});
+    if exist('PSDopen', 'var') && exist('PSDclosed', 'var') && compare_conditions
+        if size(PSDclosed,3) ~= size(PSDopen,3)
+            n_ep = diff([size(PSDclosed,3) size(PSDopen,3)]);
+            if size(PSDclosed,3) < size(PSDopen, 3)
+                PSDclosed = concatdata({PSDclosed nan(size(PSDclosed,1),size(PSDclosed,2), n_ep)});
+            else
+                PSDopen = concatdata({PSDopen nan(size(PSDopen,1),size(PSDopen,2), n_ep)});
+            end
         end
+
+        PSDall = concatdata({PSDclosed PSDopen});
+    elseif exist('PSDopen', 'var')
+        PSDall = PSDopen;
+    elseif exist('PSDclosed', 'var')
+        PSDall = PSDclosed;
+    else
+        fprintf('no PSD data available for %s\n', subnames{s})
+        if log_condition_data
+            writelines(sprintf('no PSD data available for %s\n', subnames{s}), logfile, 'WriteMode','append');
+        end
+        continue
     end
 
-    PSDall    = concatdata({PSDclosed PSDopen});
-    PSDall    = mean(PSDall, 3, 'omitnan');    
-    PSDopen   = mean(PSDopen, 3, 'omitnan');
-    PSDclosed = mean(PSDclosed, 3, 'omitnan');   
+    PSDall = mean(PSDall, 3, 'omitnan');
+
+    if exist('PSDopen', 'var')
+        PSDopen = mean(PSDopen, 3, 'omitnan');
+    end
+    if exist('PSDclosed', 'var')
+        PSDclosed = mean(PSDclosed, 3, 'omitnan');
+    end
 
     save_name = sprintf('PSD_welch_freqres_%.2f.mat', freq_res);
+    save_fields = {'freqs', 'PSDall'};
+    if exist('PSDopen', 'var'); save_fields{end+1} = 'PSDopen'; end
+    if exist('PSDclosed', 'var'); save_fields{end+1} = 'PSDclosed'; end
 
-    fprintf('saving PSDs for sub-%d\n', sub_data.apeID(s))
-    save(fullfile(savePath, save_name), 'PSDclosed', 'PSDopen', 'PSDall', 'freqs')       
+    fprintf('saving PSDs for %s\n', sub)
+    save(fullfile(savePath, save_name), save_fields{:})
 end
 
 if exist('avail_data', 'var')

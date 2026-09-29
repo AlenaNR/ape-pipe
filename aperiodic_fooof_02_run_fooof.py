@@ -14,8 +14,8 @@ from fooof import FOOOFGroup
 
 #%%
 # ----- config parameters --------------------------------
-target_folder = 'Alena' #which folder do you consider Home, to create relative paths from
-project = 'allApe' # TODO: adapt this to full participant data, need to pull project from participant name...
+target_folder = "Z:\\pb\\KPP_KPN_joined\\DynBU\\data\\processed\\EEG_resting_state\\aperiodic"  #which folder do you consider Home, to create relative paths from
+project = 'dynBUrest' 
 analydate = datetime(2026, 6, 2)
 
 condition = 'open' #all, open or closed, to pull correct file with PSDs
@@ -32,12 +32,12 @@ except NameError:
     this_dir = Path.cwd()
 
 # Directory containing subject data
-idx = this_dir.parts.index(target_folder)
-HomeDir  = Path(*this_dir.parts[:idx + 1])
-data_dir = HomeDir / 'Data' / project / 'PSD'
+# Ordner, der die Subject-Unterordner enthält
+data_dir = Path(r"Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic\PSD")
 
 psd_file = 'PSD_welch_freqres_%.2f.mat' % freq_res
-logfile = ('fooof_log_'+datetime.now().strftime("%d-%m-%Y_%H-%M")+'.txt')
+logfile = data_dir / (
+    "fooof_log_" + datetime.now().strftime("%d-%m-%Y_%H-%M") + ".txt")
 
 with open (logfile, 'w') as f:
     f.write('Starting FOOOF analysis for %s conditionn' % (condition))
