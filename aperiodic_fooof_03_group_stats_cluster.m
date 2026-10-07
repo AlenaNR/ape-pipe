@@ -21,16 +21,16 @@ clear; clc;
 
 %% ================= CONFIG =================
 
-project = 'allApe';
-root     = 'Z:\pb\KPP_KPN_joined\Aperiodic\Alena';
-dataDir  = fullfile(root, 'Data');
-rawDir   = fullfile(dataDir, project, 'rawdata');
-derivDir   = fullfile(dataDir, project, 'derivatives', 'preprocessed_eeg_baseline');
+project = 'DynBUrest';
+root     = 'Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic';
+dataDir  = root;
+% rawDir   = fullfile(dataDir, project, 'rawdata');
+% derivDir  = fullfile(dataDir, project, 'derivatives', 'preprocessed_eeg_baseline');
 
-fooofRoot = fullfile(dataDir, project, 'PSD');
+fooofRoot = fullfile(dataDir, 'PSD');
 psdRoot   = fooofRoot; % filename [cond]_fooof_exp.mat
 
-outBase = fullfile(root, 'Analyses', 'output', 'fooof', 'stats_extended');
+outBase = fullfile(fooofRoot, 'output');
 outTopo = fullfile(outBase, 'topos');
 outSpec = fullfile(outBase, 'spectra_sigclusters');
 outTbl  = fullfile(outBase, 'tables');
@@ -45,17 +45,17 @@ alpha_test    = 0.05;
 nperm         = 2000;
 
 % FOOOF/PSD frequency range for (re)constructing the aperiodic fit line
-fitRange = [1 40]; % Hz
+fitRange = [1 124]; % Hz
 
 
 %% ================= EEGLAB + FIELDTRIP =================
 toolboxDir = 'Z:\pb\KPP_KPN_joined\DynBU\analyses\toolboxes';
-eeglabDir = fullfile(toolboxDir, 'eeglab2026.0.0' );
-ftDir    = fullfile(toolboxDir, 'fieldtrip-lite-20260518', 'fieldtrip-20260518' );
+eeglabDir  = "C:\Users\bbe0557\HomeOffice\toolboxes\eeglab2026.0.0";
+ftDir      = "Z:\pb\KPP_KPN_joined\DynBU\analyses\toolboxes\fieldtrip-lite-20260518\fieldtrip-20260518";
 addpath(ftDir);
 addpath(eeglabDir);
 
-%try, eeglab('nogui'); catch, addpath(genpath(eeglabDir)); eeglab('nogui'); end
+try, eeglab('nogui'); catch, addpath(genpath(eeglabDir)); eeglab('nogui'); end
 ft_defaults;
 
 % chanloc_set = fullfile(derivDir,'06_epoched_runica','sub-003', ...
@@ -63,7 +63,7 @@ ft_defaults;
 % EEGref        = pop_loadset(chanloc_set);
 % chanlocs_all  = EEGref.chanlocs;
 
-load(fullfile(root, 'Analyses', 'ref_chanlocs.mat'))
+load(fullfile(fooofRoot, 'ref_chanlocs.mat'))
 chanlocs_all = chanlocs_all(cellfun(@(x)strcmp(x, 'EEG'), {chanlocs_all.type}));
 labels_all   = {chanlocs_all.labels};
 % labels_front = cellfun();
@@ -91,37 +91,42 @@ cfgN.feedback = 'no';
 neigh = ft_prepare_neighbours(cfgN);
 
 %% ================= LOAD PARTICIPANTS =================
-groups  = ["ANX", "OCD", "HC"];
-pairs   = {"ANX", "HC"; "OCD", "HC"; "ANX", "OCD"};
+groups  = ["ADO", "YA"];
+pairs   = {"ADO", "YA"};
 
-xlsxPath = fullfile(dataDir,'participants', 'groupMasks.csv');
+xlsxPath = fullfile(root, 'sub_sd.csv');
 if ~exist(xlsxPath,'file')
     error('Missing participant table: %s', xlsxPath);
 end
 
 Traw = readtable(xlsxPath,'VariableNamingRule','preserve');
 
-% hard requirement: ID
-if ~all(ismember({'ID'}, string(Traw.Properties.VariableNames)))
+% hard requirement: ID + Group
+if ~all(ismember({'Subject', 'Group'}, string(Traw.Properties.VariableNames)))
     disp(Traw.Properties.VariableNames);
     error('participants.xlsx must contain VPNummer and Group columns.');
 end
 
-Traw.sub   = string(arrayfun(@(x)sprintf('sub-%5d',x), Traw.ID,'uni',0));
-Group = string(num2str(Traw.internalising));
-%Group(Traw.internalising == 1) = "INT";
-Group(Traw.ANX == 1 & Traw.OCD == 0) = "ANX";
-Group(Traw.ANX == 0 & Traw.OCD == 1) = "OCD";
-Group(Traw.superHealthy == 1 | Traw.onlyLT == 1) = "HC";
+% Traw.sub   = string(arrayfun(@(x)sprintf('sub-%5d',x), Traw.Subject,'uni',0));
+% Group = string(num2str(Traw.internalising));
+% %Group(Traw.internalising == 1) = "INT";
+% Group(Traw.ANX == 1 & Traw.OCD == 0) = "ANX";
+% Group(Traw.ANX == 0 & Traw.OCD == 1) = "OCD";
+% Group(Traw.superHealthy == 1 | Traw.onlyLT == 1) = "HC";
 
-Traw.Group = Group;
+Traw = renamevars(Traw, "Subject", "sub");
+Traw.Group = string(Traw.Group);
+Traw.Group(Traw.Group == "YoungAdult") = "YA";
+Traw.Group(Traw.Group == "Adolescent") = "ADO";
+
+% Traw.Group = Group;
 Traw.noPSD = zeros(height(Traw),1);
 
 % ===== Spectra colors (match your provided figure: HC=purple, PP=orange, CHR=green) =====
 % (Pastel tones sampled/approximated from the figure)
 COL.(groups(1))  = [0.742 0.681 0.826];  % purple
 COL.(groups(2))  = [0.833 0.683 0.528];  % orange
-COL.(groups(3))  = [0.498 0.781 0.496];  % green
+%COL.(groups(3))  = [0.498 0.781 0.496];  % green
 
 % ===== X marker styling =====
 % RAW exponent difference plots: WHITE X
@@ -269,7 +274,7 @@ for cond_to_use = "open" %["open","closed"]
     design=zeros(1,height(T));
     design(T.Group==groups(1))  = 1;
     design(T.Group==groups(2))  = 2;
-    design(T.Group==groups(3))  = 3;
+%    design(T.Group==groups(3))  = 3;
 
     cfg=[];
     cfg.method            = 'montecarlo';
@@ -706,7 +711,7 @@ xlabel(ax,'Frequency (Hz)');
 ylabel(ax,'PSD');
 grid(ax,'on');
 
-xt = [1 2 3 5 8 10 15 20 30 40];
+xt = [1 2 3 5 8 10 15 20 30 40 60 100];
 xt = xt(xt>=min(freqsRef) & xt<=max(freqsRef));
 ax.XTick = xt;
 ax.XTickLabel = string(xt);

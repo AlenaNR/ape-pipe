@@ -45,6 +45,8 @@ with open (logfile, 'w') as f:
 # Iterate through all folders
 for folder in data_dir.iterdir():
     if folder.is_dir():
+        if "sub-" not in folder.name:
+            continue
         print(f"Processing {folder.name}")
         file_load = data_dir / folder.name / psd_file
         file_save = data_dir / folder.name / (condition + '_fooof_exp.mat')

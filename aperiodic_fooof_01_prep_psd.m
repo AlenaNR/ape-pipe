@@ -38,7 +38,8 @@ eeglab('nogui');
 
 %% get subject data and check if summary should be created
 sub_data = readtable("Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic\sub_sd.csv");%readtable(fullfile(dataDir,  'participants', 'all_participant_data.csv'));
-subnames = sub_data.Subject;%sub_data.ID;
+%subnames = sub_data.Subject;%sub_data.ID;
+subnames = readcell('Z:\pb\KPP_KPN_joined\DynBU\data\processed\EEG_resting_state\aperiodic\PSD\PSDissue.txt');
 
 if exist("start_sub", 'var') 
     subnames = subnames(find(strcmp(subnames, start_sub),1, 'first'):end);
