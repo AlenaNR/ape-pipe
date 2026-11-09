@@ -1,4 +1,10 @@
-%% Alena starts FOOOF
+%% extracting the PSD per channel from preprocessed EEG data.
+% uses welch's method for power estimates and applies it channelwise to
+% epoched datasets, then averages over epochs.
+% 
+% outputs: chan x freq matrices per participant
+% 
+% Dependencies: EEGLab
 clear all;
 
 %% set config parameters -------------------------------------------------
@@ -8,7 +14,7 @@ analydate = [];%"01-Juni-2026"; %# TODO: make this more flexible to accept engli
 %start_sub = 'sub-135'; %# TODO: add option to pass sub list?
 
 freq_lp = 124; % what was the low pass filter in preprocessing?
-freq_res = 0.5; %this very much determines size of resulting data set
+freq_res = 0.5; % this very much determines size of resulting data set
 
 min_ep = 5; % how many epochs do we need per participant?
 all_subs = false; % should we make a struct including all subjects data?

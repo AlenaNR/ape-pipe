@@ -34,7 +34,7 @@ Int_IDs = masks.ID(masks.internalising == 1);
 HC_IDs = masks.ID((masks.internalising == 0) & (masks.externalising == 0)); % for now excluding controls with primary externalising diagnosis
 
 % load questionnaire data
-questData = readtable(fullfile(questPath, "ape_all_participant_data.csv"));
+questData = readtable(fullfile(questPath, "ape_all_participant_data_complete.xlsx"));
 
 % check if EEG data available
 subFolders = dir(fullfile(fooofPath, 'sub-*'));

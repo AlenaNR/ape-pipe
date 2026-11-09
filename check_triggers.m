@@ -1,4 +1,7 @@
 %% segment counterbalancing overview
+% reads trigger information from eeg marker files and writes them into a
+% table. Written for Resting-state data recorded in KPN since 2019.
+% ANR, October 2026
 
 root = "Z:\pb\KPP_KPN_joined\Aperiodic\Alena\Data";
 pps = readtable(fullfile(root, "allApe\ape_all_participant_data.csv"));
