@@ -6,7 +6,8 @@
 clear;
 
 root = "Z:\pb\KPP_KPN_joined\Aperiodic\Alena\Data";
-rawQuestDir = fullfile(root, "Questionnaires", "raw");
+SourceQuestDir = fullfile(root, "Questionnaires", "raw", "GRK_raw");
+rawQuestDir = fileparts(SourceQuestDir);
 outDir = fullfile(root, "allApe");
 outputFile = fullfile(rawQuestDir, "GRK_raw_quest_data.csv");
 
@@ -80,7 +81,7 @@ GRKQuestTable = [table(participantIDs, 'VariableNames', {'ID'}), itemTable];
 %% Step 2: Read each GRK source, identify LimeSurvey or PsychEQ, and fill mapped item cells.
 
 % Restrict candidates to top-level GRK spreadsheets and CSV files.
-sourceFiles = dir(rawQuestDir);
+sourceFiles = dir(SourceQuestDir);
 sourceFiles = sourceFiles(~[sourceFiles.isdir]);
 sourceFileNames = string({sourceFiles.name})';
 lowerFileNames = lower(sourceFileNames);
@@ -88,13 +89,13 @@ isSpreadsheetOrCSV = endsWith(lowerFileNames, ".xlsx") | ...
     endsWith(lowerFileNames, ".xls") | endsWith(lowerFileNames, ".csv");
 sourceFiles = sourceFiles(startsWith(lowerFileNames, "grk") & isSpreadsheetOrCSV);
 if isempty(sourceFiles)
-    error("No GRK spreadsheet or CSV sources were found in %s.", rawQuestDir);
+    error("No GRK spreadsheet or CSV sources were found in %s.", SourceQuestDir);
 end
 
 mappedVariablesFound = false(numel(itemVariables), 1);
 for fileIndex = 1:numel(sourceFiles)
     sourceFileName = string(sourceFiles(fileIndex).name);
-    sourceFilePath = fullfile(rawQuestDir, sourceFileName);
+    sourceFilePath = fullfile(SourceQuestDir, sourceFileName);
 
     % LimeSurvey exports are identified by filename; questionnaire workbooks
     % use the PsychEQ source mappings in the codebook.

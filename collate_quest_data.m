@@ -10,7 +10,7 @@ raw_quest_dir = fullfile(root, "Questionnaires", "raw");
 out_dir = fullfile(root, "allApe");
 
 projects = ["AD1", "AD2", "GRK", "ESA", "ESA2"];
-projectsToProcess = "GRK";% projects; % Set to one or more projects, e.g. ["ESA2"]
+projectsToProcess = projects; % Set to one or more projects, e.g. ["ESA2"]
 questionnaires = ["ASI", "BDI-II", "BIS-BAS", "IUS", "OCI-R", "PSQ", "PSWQ", "RS", "STAI-T", "STAI-S"];
 % could add questionnairesToProcess in same logic # nice-to-have
 
@@ -19,7 +19,7 @@ questionnaires = ["ASI", "BDI-II", "BIS-BAS", "IUS", "OCI-R", "PSQ", "PSWQ", "RS
 % Keep the original table headers so MATLAB does not rename source variables.
 mapping = readtable(fullfile(raw_quest_dir, "Codebook.xlsx"), ...
     "Sheet", "Codebook", "VariableNamingRule", "preserve");
-mapping = removevars(mapping, ["Label / Itemtext", "Antwortskala", "Wertebereich"]);
+mapping = removevars(mapping, ["Label / Itemtext", "Antwortskala"]);
 mapping = mapping(strcmp(mapping.Typ, "Item"), :);
 mapping = mapping(~ismember(string(mapping.Instrument), ["PSQI"]), :); % remove rows for irrelevant questionnaires
 mapping.Variable = replace(string(mapping.Variable), "-", "_");
@@ -52,6 +52,7 @@ elseif ~all(ismember(projects, projectsToProcess))
 else
     MasterTable = table('Size', [height(allPP), numel(colNames)], ...
         'VariableTypes', repmat("double", 1, numel(colNames)), 'VariableNames', colNames);
+    MasterTable{:,:} = NaN(height(allPP), numel(colNames));
     MasterTable.ID = allPP.apeID;
 end
 
@@ -191,7 +192,8 @@ for projectIndex = 1:numel(projectsToProcess)
 
     %Loop over questionnaire items
     for mapRow = 1:height(mapping)
-        questionnaire = string(mapping.Instrument(mapRow)); % get questionnaire name
+        questionnaire = string(mapping.Instrument(mapRow)); % get questionnaire name 
+
         if questionnaire ~= currentQuestionnaire
             if strlength(currentQuestionnaire) > 0
                 if questionnaireHasData && ~ismember(currentQuestionnaire, availableQuestionnaires)
@@ -344,18 +346,22 @@ for projectIndex = 1:numel(projectsToProcess)
                     if iscell(rawValue)
                         rawValue = rawValue{1};
                     end
+
                     if isnumeric(rawValue) || islogical(rawValue)
                         currentValue = double(rawValue);
                     else
                         currentValue = str2double(string(rawValue));
                     end
+
                     if foundValues(participantIndex) && ...
                             ~isequaln(selectedValues(participantIndex), currentValue)
                         error("Conflicting values for %s, ID %s, in multiple source files.", ...
                             targetVariable, projectID);
                     end
+
                     selectedValues(participantIndex) = currentValue;
                     foundValues(participantIndex) = true;
+
                 end
             end
         end
@@ -375,13 +381,46 @@ for projectIndex = 1:numel(projectsToProcess)
         fprintf('Done with project %s, raw data available for %d questionnaires\n  Missing questionnaires: %s\n', ...
             project, numel(availableQuestionnaires), strjoin(missingQuestionnaires, ", "));
     else
-        fprintf('Done with project %s, raw data available for all %d questionnaires\n', ...
+        fprintf('Done with project %s, raw data available for %d questionnaires\n', ...
             project, numel(availableQuestionnaires));
     end
    
 end
 
 %% Step 5: Save the updated collated questionnaire table.
+projectNames = unique(string(allPP.Project), "stable");
+for mapRow = 1:height(mapping)
+    itemVariable = string(mapping.Variable(mapRow));
+    questionnaire = string(mapping.Instrument(mapRow));
+    rangeText = strtrim(string(mapping.Wertebereich{mapRow}));
+    rangeTokens = regexp(char(rangeText), ...
+        '^\s*(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)\s*$', "tokens", "once");
+    if isempty(rangeTokens)
+        error("Could not parse Wertebereich '%s' for %s / %s.", ...
+            rangeText, questionnaire, itemVariable);
+    end
+    rangeBounds = str2double(string(rangeTokens));
+    if rangeBounds(1) > rangeBounds(2)
+        error("Invalid Wertebereich '%s' for %s / %s.", ...
+            rangeText, questionnaire, itemVariable);
+    end
+
+    for projectIndex = 1:numel(projectNames)
+        project = projectNames(projectIndex);
+        projectRows = string(allPP.Project) == project;
+        itemValues = MasterTable{projectRows, itemVariable};
+        invalidValues = ~isnan(itemValues) & ...
+            (itemValues < rangeBounds(1) | itemValues > rangeBounds(2));
+        if any(invalidValues)
+            invalidRows = find(projectRows);
+            invalidRows = invalidRows(invalidValues);
+            invalidEntries = string(allPP.ID(invalidRows)) + "=" + ...
+                compose("%.15g", MasterTable{invalidRows, itemVariable});
+            warning("Out-of-range data for questionnaire %s, project %s, item %s (%d value(s)): %s", ...
+                questionnaire, project, itemVariable, numel(invalidRows), ...
+                strjoin(invalidEntries, ", "));
+        end
+    end
+end
 
 writetable(MasterTable, masterTableFile);
-

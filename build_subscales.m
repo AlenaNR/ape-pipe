@@ -7,7 +7,7 @@ rawData = readtable(fullfile(root, "allApe_raw_quest_data.csv"));
 scoresTable = table('Size', [height(rawData), 0], 'VariableTypes', {}, 'VariableNames', {});
 scoresTable.apeID = rawData.ID;
 
-%% ASI-3
+%% ASI-3 (anxiety sensitivity)
 scoresTable.ASIsum = sumItems(rawData, "ASI_3", 1:18, [], 0, 4, [0 72], "ASI-3 sumscore");
 scoresTable.ASIbody = sumItems(rawData, "ASI_3", [3 4 7 8 12 15], [], 0, 4, [0 24], "ASI-3 body subscale");
 scoresTable.ASIcognitive = sumItems(rawData, "ASI_3", [2 5 10 14 16 18], [], 0, 4, [0 24], "ASI-3 cognitive subscale");
@@ -38,10 +38,6 @@ scoresTable.BAS_Antrieb = sumItems(rawData, "BIS_BAS", [3 9 12 21], [], 1, 4, [4
 scoresTable.BAS_Spasssuche = sumItems(rawData, "BIS_BAS", [5 10 15 20], [], 1, 4, [4 16], "BAS Spasssuche");
 scoresTable.BAS_Belohnungsempfaenglichkeit = sumItems(rawData, "BIS_BAS", [4 7 14 18 23], [], 1, 4, [5 20], "BAS Belohnungsempfaenglichkeit");
 
-
-%% RS-11
-scoresTable.RS11_Gesamt = sumItems(rawData, "RS_11", 1:11, [], 1, 7, [11 77], "RS-11 Gesamt");
-
 %% STAI-T
 scoresTable.STAI_T = sumItems(rawData, "STAI_T", 1:20, [1 6 7 10 13 16 19], 1, 4, [20 80], "STAI-T Gesamt");
 
@@ -51,12 +47,15 @@ scoresTable.STAI_S = sumItems(rawData, "STAI_S", 1:20, [1 2 5 8 10 11 15 16 19 2
 %% PSWQ
 scoresTable.PSWQ = sumItems(rawData, "PSWQ", 1:16, [1 3 8 10 11], 1, 5, [16 80], "PSWQ Gesamt");
 
+%% RS-11
+scoresTable.RS11_Gesamt = sumItems(rawData, "RS_11", 1:11, [], 1, 7, [11 77], "RS-11 Gesamt");
+
 %% RS-13
 scoresTable.RS13_Gesamt = sumItems(rawData, "RS_13", 1:13, [], 1, 7, [13 91], "RS-13 Gesamt");
 scoresTable.RS13_Kompetenz = sumItems(rawData, "RS_13", [1 2 5 6 8 9 10 11 12], [], 1, 7, [9 63], "RS-13 Kompetenz");
 scoresTable.RS13_Akzeptanz = sumItems(rawData, "RS_13", [3 4 7 13], [], 1, 7, [4 28], "RS-13 Akzeptanz");
 
-%% IUS-12
+%% IUS-12, -27
 scoresTable.IUS12_Gesamt = sumIUS12Items(rawData, 1:12, [1 3 8 10 11 12 15 16 18 19 21 22], [12 60], "IUS-12 Gesamt");
 scoresTable.IUS12_Hemmungsangst = sumIUS12Items(rawData, 1:6, [1 3 12 15 16 22], [6 30], "IUS-12 Hemmungsangst");
 scoresTable.IUS12_ProspektiveAngst = sumIUS12Items(rawData, 7:12, [8 10 11 18 19 21], [6 30], "IUS-12 Prospektive Angst");
@@ -101,7 +100,7 @@ function scores = sumItems(data, itemPrefix, itemNumbers, reverseItems, minRespo
 end
 
 function scores = sumIUS12Items(data, shortFormItems, longFormItems, scoreRange, scaleName)
-	shortValues = data{:, cellstr(itemNamesFor(data, "IUS_12", shortFormItems))};
+	shortValues = data{:, cellstr(itemNamesFor(data, "IUS_12", shortFormItems))};    
 	longValues = data{:, cellstr(itemNamesFor(data, "IUS_27", longFormItems))};
 	if ~isnumeric(shortValues)
 		shortValues = str2double(string(shortValues));
