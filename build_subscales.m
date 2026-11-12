@@ -3,7 +3,6 @@
 root = "Z:\pb\KPP_KPN_joined\Aperiodic\Alena\Data\allApe";
 
 rawData = readtable(fullfile(root, "allApe_raw_quest_data.csv"));
-
 scoresTable = table('Size', [height(rawData), 0], 'VariableTypes', {}, 'VariableNames', {});
 scoresTable.apeID = rawData.ID;
 
@@ -80,12 +79,25 @@ missingScoreCountPerSubject = table(scoresTable.apeID, sum(missingScoreMatrix, 2
 
 disp("Missing subjects per scale:")
 disp(missingScoresByScale)
-% disp("Missing score count per subject:")
-% disp(missingScoreCountPerSubject)
+missingCountsByProject = zeros(5, numel(scoreNames));
+idStrings = string(scoresTable.apeID);
+for p = 1:5
+	ids = startsWith(idStrings, string(p));
+    disp(sum(ids))
+	missingCountsByProject(p, :) = sum(missingScoreMatrix(ids, :), 1);
+end
+
+missingScoresByProjectScale = array2table(missingCountsByProject, 'VariableNames', scoreNames);
+missingScoresByProjectScale = addvars(missingScoresByProjectScale, (1:5)', ...
+	'Before', 1, 'NewVariableNames', 'Project');
+
+disp("Missing subjects per project and scale:")
+disp(missingScoresByProjectScale)
 
 writetable(scoresTable, fullfile(root, "allApe_subscale_data.csv"))
 writetable(missingScoresByScale, fullfile(root, "allApe_missing_subjects_by_scale.csv"))
 writetable(missingScoreCountPerSubject, fullfile(root, "allApe_missing_score_count_per_subject.csv"))
+writetable(missingScoresByProjectScale, fullfile(root, "allApe_missing_subjects_by_project_and_scale.csv"))
 
 %% helper functions
 
