@@ -10,7 +10,7 @@ raw_quest_dir = fullfile(root, "Questionnaires", "raw");
 out_dir = fullfile(root, "allApe");
 
 projects = ["AD1", "AD2", "GRK", "ESA", "ESA2"];
-projectsToProcess = projects; % Set to one or more projects, e.g. ["ESA2"]
+projectsToProcess = [];%projects; % Set to one or more projects, e.g. ["ESA2"]
 questionnaires = ["ASI", "BDI-II", "BIS-BAS", "IUS", "OCI-R", "PSQ", "PSWQ", "RS", "STAI-T", "STAI-S"];
 % could add questionnairesToProcess in same logic # nice-to-have
 
@@ -387,7 +387,8 @@ for projectIndex = 1:numel(projectsToProcess)
    
 end
 
-%% Step 5: Save the updated collated questionnaire table.
+%% Step 5: Check and Save the updated collated questionnaire table.
+% Check if any items are out of range based on Codebook.xlsx. If any out-of-range values are found, a warning is issued but the table is still saved.
 projectNames = unique(string(allPP.Project), "stable");
 for mapRow = 1:height(mapping)
     itemVariable = string(mapping.Variable(mapRow));
@@ -422,5 +423,48 @@ for mapRow = 1:height(mapping)
         end
     end
 end
+
+%% Summarize missing items by participant and questionnaire.
+summaryVariables = ["MissingItems", "MissingItemsPercent"];
+existingSummaryVariables = intersect(summaryVariables, ...
+    string(MasterTable.Properties.VariableNames));
+if ~isempty(existingSummaryVariables)
+    MasterTable = removevars(MasterTable, existingSummaryVariables);
+end
+
+missingSubjectIDs = strings(0, 1);
+missingQuestionnaireNames = strings(0, 1);
+missingItemNames = strings(0, 1);
+missingItemCounts = zeros(0, 1);
+missingItemPercents = zeros(0, 1);
+
+for q = 1:numel(questionnaires)
+    questionnaire = questionnaires(q);
+    itemRows = string(mapping.Instrument) == questionnaire;
+    itemVariables = string(mapping.Variable(itemRows));
+    if isempty(itemVariables)
+        continue;
+    end
+
+    for pp = 1:height(MasterTable)
+        missingItems = itemVariables(isnan(MasterTable{pp, itemVariables}));
+        if isempty(missingItems)
+            continue;
+        end
+
+        missingSubjectIDs(end+1, 1) = string(MasterTable.ID(pp));
+        missingQuestionnaireNames(end+1, 1) = questionnaire;
+        missingItemNames(end+1, 1) = strjoin(missingItems, ", ");
+        missingItemCounts(end+1, 1) = numel(missingItems);
+        missingItemPercents(end+1, 1) = 100 * numel(missingItems) / numel(itemVariables);
+    end
+end
+
+MissingItemsTable = table(missingSubjectIDs, missingQuestionnaireNames, ...
+    missingItemNames, missingItemCounts, missingItemPercents, ...
+    'VariableNames', {'ID', 'Questionnaire', 'MissingItems', ...
+    'MissingItemCount', 'MissingItemsPercent'});
+missingItemTableFile = fullfile(out_dir, "allApe_missing_quest_items.csv");
+writetable(MissingItemsTable, missingItemTableFile);
 
 writetable(MasterTable, masterTableFile);
