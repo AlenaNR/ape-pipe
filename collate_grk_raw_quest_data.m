@@ -20,8 +20,10 @@ mapping = mapping(~ismember(upper(string(mapping.Instrument)), ["PSQI", "IUS-12"
 mappingColumnKeys = lower(regexprep(string(mapping.Properties.VariableNames), "[^a-zA-Z0-9]", ""));
 psychEQColumn = find(mappingColumnKeys == "quellspaltepsychoeqexport", 1);
 limeSurveyColumn = find(mappingColumnKeys == "quellspaltegrklimesurveyxlsx", 1);
-if isempty(psychEQColumn) || isempty(limeSurveyColumn)
-    error("Could not find the PsychEQ and GRK LimeSurvey source columns in the codebook.");
+inverseCol = find(startsWith(mappingColumnKeys, "invers"), 1);
+inversionColumn = find(mappingColumnKeys == "umpolung", 1);
+if isempty(psychEQColumn) || isempty(limeSurveyColumn) || isempty(inverseCol)
+    error("Could not find the required source or inverse columns in the codebook.");
 end
 psychEQVariables = string(mapping{:, psychEQColumn});
 limeSurveyVariables = string(mapping{:, limeSurveyColumn});
@@ -45,6 +47,12 @@ limeSurveyVariables(dateTimeRows) = [];
 mapping.Variable = replace(string(mapping.Variable), "-", "_");
 mapping.Variable = replace(string(mapping.Variable), "/", "_");
 itemVariables = string(mapping.Variable);
+inverseFlags = lower(strtrim(string(mapping{:, inverseCol})));
+inverseItems = ~ismissing(inverseFlags) & inverseFlags == "ja";
+if any(inverseItems) && isempty(inversionColumn)
+    error("The codebook marks items for inversion but has no Inversion column.");
+end
+
 if any(itemVariables == "ID") || numel(unique(itemVariables)) ~= numel(itemVariables)
     error("The codebook contains duplicate output variable names or an item named ID.");
 end
@@ -187,6 +195,10 @@ for fileIndex = 1:numel(sourceFiles)
         mappedVariablesFound(mapRow) = true;
         targetVariable = char(itemVariables(mapRow));
         sourceValues = convertToNumeric(sourceTable{:, sourceColumn});
+        if sourceType == "LimeSurvey" && inverseItems(mapRow)
+            sourceValues = applyInversion(sourceValues, mapping{mapRow, inversionColumn}, ...
+                itemVariables(mapRow));
+        end
         for sourceRow = sourceRowIndices'
             outputRow = find(participantIDs == sourceIDs(sourceRow), 1);
             currentValue = sourceValues(sourceRow);
@@ -283,4 +295,37 @@ function values = convertToNumeric(rawValues)
         values = str2double(strtrim(string(rawValues)));
     end
     values = values(:);
+end
+
+function values = applyInversion(values, calculation, itemVariable)
+    calculation = strtrim(string(calculation));
+    if ismissing(calculation) || strlength(calculation) == 0
+        error("No Inversion calculation is defined for item %s.", itemVariable);
+    end
+
+    numberPattern = '([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)';
+    leftTokens = regexp(char(calculation), ...
+        ['^\s*Rohwert\s*([+\-*/])\s*' numberPattern '\s*$'], "tokens", "once", "ignorecase");
+    rightTokens = regexp(char(calculation), ...
+        ['^\s*' numberPattern '\s*([+\-*/])\s*Rohwert\s*$'], "tokens", "once", "ignorecase");
+
+    if ~isempty(leftTokens)
+        operator = leftTokens{1};
+        constant = str2double(leftTokens{2});
+        valueIsLeft = true;
+    elseif ~isempty(rightTokens)
+        constant = str2double(rightTokens{1});
+        operator = rightTokens{2};
+        valueIsLeft = false;
+    else
+        error("Unsupported Umpolung calculation for item %s: %s.", ...
+            itemVariable, calculation);
+    end
+
+    if ~valueIsLeft
+        values = constant - values;
+    else
+        values = values - constant;
+    end
+
 end
