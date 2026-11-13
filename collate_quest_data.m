@@ -10,8 +10,9 @@ raw_quest_dir = fullfile(root, "Questionnaires", "raw");
 out_dir = fullfile(root, "allApe");
 
 projects = ["AD1", "AD2", "GRK", "ESA", "ESA2"];
-projectsToProcess = [];%projects; % Set to one or more projects, e.g. ["ESA2"]
+projectsToProcess = projects; % Set to one or more projects, e.g. ["ESA2"]
 questionnaires = ["ASI", "BDI-II", "BIS-BAS", "IUS", "OCI-R", "PSQ", "PSWQ", "RS", "STAI-T", "STAI-S"];
+overwrite = true; % make new MasterTable?
 % could add questionnairesToProcess in same logic # nice-to-have
 
 %% Step 1: Load the codebook and define the questionnaire item columns.
@@ -37,7 +38,7 @@ if any(~ismember(projectsToProcess, projects))
     error("projectsToProcess contains an unknown project.");
 end
 
-if isfile(masterTableFile)
+if isfile(masterTableFile) && ~overwrite
     MasterTable = readtable(masterTableFile, "VariableNamingRule", "preserve");
     missingColumns = setdiff(colNames, string(MasterTable.Properties.VariableNames));
     if ~isempty(missingColumns)
@@ -343,6 +344,9 @@ for projectIndex = 1:numel(projectsToProcess)
                     end
 
                     rawValue = sourceTable{matchingRows, sourceColumns(sourceIndex)};
+                    if contains(targetVariable, "BAS_Item_16")
+                        rawValue = 5 - rawValue; % reverse BAS_Item_16 (was not done in raw data)
+                    end
                     if iscell(rawValue)
                         rawValue = rawValue{1};
                     end
@@ -359,7 +363,7 @@ for projectIndex = 1:numel(projectsToProcess)
                             targetVariable, projectID);
                     end
 
-                    selectedValues(participantIndex) = currentValue;
+                                        selectedValues(participantIndex) = currentValue;
                     foundValues(participantIndex) = true;
 
                 end

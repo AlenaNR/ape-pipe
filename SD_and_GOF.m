@@ -58,9 +58,8 @@ for projectIndex = 1:numel(projects)
         maxResponse = definition{6};
         invalidValues = itemData < minResponse | itemData > maxResponse;
         itemData(invalidValues) = NaN;
-        reversePositions = ismember(itemNumbers, definition{4});
-        itemData(:, reversePositions) = minResponse + maxResponse - itemData(:, reversePositions);
 
+        fprintf('calculating alpha for %s in %s\n', scaleName, projects(projectIndex))
         [alpha, completeSubjects] = cronbach_alpha(itemData);
         resultIndex = resultIndex + 1;
         resultProjects(resultIndex) = projects(projectIndex);
@@ -73,7 +72,7 @@ end
 alphaResults = table(resultProjects, resultScales, completeSubjectCount, alphaValues, ...
     'VariableNames', {'Project', 'Scale', 'CompleteSubjects', 'CronbachAlpha'});
 disp(alphaResults)
-writetable(alphaResults, fullfile(DataRoot, "allApe_cronbach_alpha_by_project.csv")); % TODO: check if raw values were already reversed, which would explain negative alpha values.
+writetable(alphaResults, fullfile(DataRoot, "allApe_cronbach_alpha_by_project.csv")); 
 
 %% RS: comparability
 % normalise RS-11 and RS-13 for projects where both are available and
@@ -146,7 +145,6 @@ function [a, completeSubjects] = cronbach_alpha(X)
 
     itemVariances = var(X, 0, 1);
     totalVariance = var(sum(X, 2), 0, 1);
-    assert(sum(itemVariances)<totalVariance, "itemVariance larger than total variance. Check data orientation or inversion of items")
     if totalVariance == 0 || ~isfinite(totalVariance)
         return;
     end
